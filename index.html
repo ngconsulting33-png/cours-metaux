@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Cours or et argent</title>
+<style>
+  :root { --fond: transparent; --texte: #222; --pos: #1a8a3c; --neg: #d12c2c; --soft: #777; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--fond); color: var(--texte);
+    font: 14px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 22px; padding: 6px 10px; min-height: 34px; }
+  .m { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap; }
+  .m b { font-weight: 700; letter-spacing: .04em; }
+  .p { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .v { font-size: .9em; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .v.pos { color: var(--pos); } .v.neg { color: var(--neg); } .v.neutre { color: var(--soft); }
+  .v small { font-weight: 400; color: var(--soft); }
+  .maj { color: var(--soft); font-size: .8em; }
+  @media (max-width: 520px) { .bar { gap: 3px 14px; font-size: 13px; } .maj { width: 100%; text-align: center; } }
+</style>
+</head>
+<body>
+<div class="bar" id="b" aria-live="polite"><span class="maj">Chargement des cours…</span></div>
+<script>
+(function () {
+  // Réglages par l'adresse : ?theme=sombre (fond foncé) ?u=g (prix au gramme, par défaut kg) &fond=ffffff &texte=222222 &maj=0 (masque l'heure)
+  var q = new URLSearchParams(location.search), hex = /^[0-9a-fA-F]{3,8}$/;
+  var r = document.documentElement.style;
+  if (hex.test(q.get("fond") || "")) r.setProperty("--fond", "#" + q.get("fond"));
+  if (hex.test(q.get("texte") || "")) r.setProperty("--texte", "#" + q.get("texte"));
+  if (q.get("theme") === "sombre") {  // pour fond foncé : texte clair, vert/rouge éclaircis
+    if (!q.get("texte")) r.setProperty("--texte", "#ffffff");
+    r.setProperty("--pos", "#6fe39a"); r.setProperty("--neg", "#ff8a80"); r.setProperty("--soft", "#e3cdb8");
+  }
+  var gramme = q.get("u") === "g", montrerMaj = q.get("maj") !== "0";
+  var nf = function (x, d) { return x.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }); };
+
+  function variation(j, w) {
+    var v = j || w; if (!v || v.pct == null) return "";
+    var c = v.pct > 0 ? "pos" : v.pct < 0 ? "neg" : "neutre", f = v.pct > 0 ? "▲" : v.pct < 0 ? "▼" : "■";
+    return '<span class="v ' + c + '">' + f + " " + (v.pct > 0 ? "+" : "") + nf(v.pct, 2) + " %" +
+      " <small>" + (j ? "jour" : "sem.") + "</small></span>";
+  }
+  function bloc(nom, kg, j, w) {
+    var val = gramme ? nf(kg / 1000, kg > 20000 ? 2 : 3) + " €/g" : nf(kg, 0) + " €/kg";
+    return '<span class="m"><b>' + nom + '</b><span class="p">' + val + "</span>" + variation(j, w) + "</span>";
+  }
+  function afficher(d) {
+    var h = bloc("OR", d.or_kg, d.jour_or, d.var_or) + bloc("ARGENT", d.ag_kg, d.jour_ag, d.var_ag);
+    if (montrerMaj) {
+      var t = new Date(d.genere_le), ok = !isNaN(t);
+      h += '<span class="maj">Cours indicatifs' + (ok ? " · relevé du " + t.toLocaleString("fr-FR",
+        { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", " à") : "") + "</span>";
+    }
+    document.getElementById("b").innerHTML = h;
+  }
+  function charger() {
+    fetch("data/public.json?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (d) { if (d && d.or_kg && d.ag_kg) afficher(d); })
+      .catch(function () { /* on garde l'affichage précédent */ });
+  }
+  charger(); setInterval(charger, 120000);
+})();
+</script>
+</body>
+</html>
