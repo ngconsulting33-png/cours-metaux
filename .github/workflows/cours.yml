@@ -35,7 +35,7 @@ jobs:
       - name: Relever les cours
         run: |
           mkdir -p _site/data
-          cp index.html robots.txt _site/
+          cp index.html graphique.html robots.txt _site/
           python3 releve.py _site/data/public.json
 
       - uses: actions/upload-pages-artifact@v3
