@@ -17,6 +17,7 @@
   .v { font-size: .9em; font-weight: 600; font-variant-numeric: tabular-nums; }
   .v.pos { color: var(--pos); } .v.neg { color: var(--neg); } .v.neutre { color: var(--soft); }
   .v small { font-weight: 400; color: var(--soft); }
+  .kg { font-weight: 400; font-size: .9em; color: var(--soft); }
   .maj { color: var(--soft); font-size: .8em; }
   @media (max-width: 520px) { .bar { gap: 3px 14px; font-size: 13px; } .maj { width: 100%; text-align: center; } }
 </style>
@@ -25,7 +26,7 @@
 <div class="bar" id="b" aria-live="polite"><span class="maj">Chargement des cours…</span></div>
 <script>
 (function () {
-  // Réglages par l'adresse : ?theme=sombre (fond foncé) ?u=g (prix au gramme, par défaut kg) &fond=ffffff &texte=222222 &maj=0 (masque l'heure)
+  // Réglages par l'adresse : ?theme=sombre (fond foncé) ?u=g (gramme seul) ?u=kg (kilo seul) ; par défaut : gramme (kilo) &fond=ffffff &texte=222222 &maj=0 (masque l'heure)
   var q = new URLSearchParams(location.search), hex = /^[0-9a-fA-F]{3,8}$/;
   var r = document.documentElement.style;
   if (hex.test(q.get("fond") || "")) r.setProperty("--fond", "#" + q.get("fond"));
@@ -34,7 +35,7 @@
     if (!q.get("texte")) r.setProperty("--texte", "#ffffff");
     r.setProperty("--pos", "#6fe39a"); r.setProperty("--neg", "#ff8a80"); r.setProperty("--soft", "#e3cdb8");
   }
-  var gramme = q.get("u") === "g", montrerMaj = q.get("maj") !== "0";
+  var unite = q.get("u"), montrerMaj = q.get("maj") !== "0";
   var nf = function (x, d) { return x.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }); };
 
   function variation(j, w) {
@@ -44,7 +45,8 @@
       " <small>" + (j ? "jour" : "sem.") + "</small></span>";
   }
   function bloc(nom, kg, j, w) {
-    var val = gramme ? nf(kg / 1000, kg > 20000 ? 2 : 3) + " €/g" : nf(kg, 0) + " €/kg";
+    var g = nf(kg / 1000, kg > 20000 ? 2 : 3) + " €/g", k = nf(kg, 0) + " €/kg";
+    var val = unite === "g" ? g : unite === "kg" ? k : g + ' <span class="kg">(' + k + ")</span>";
     return '<span class="m"><b>' + nom + '</b><span class="p">' + val + "</span>" + variation(j, w) + "</span>";
   }
   function afficher(d) {
