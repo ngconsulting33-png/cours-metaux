@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Graphique des cours</title>
+<style>
+  :root { --fond: transparent; --texte: #222; --pos: #1a8a3c; --neg: #d12c2c; --soft: #777; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--fond); color: var(--texte);
+    font: 14px/1.25 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  #entete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 6px 4px 8px; }
+  #entete[hidden] { display: none; }
+  .nom { font-weight: 700; letter-spacing: .04em; }
+  .prix { font-size: 1.55em; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .g { color: var(--soft); font-variant-numeric: tabular-nums; }
+  .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .v.pos { color: var(--pos); } .v.neg { color: var(--neg); } .v.neutre { color: var(--soft); }
+  .v small { font-weight: 400; color: var(--soft); }
+  .maj { color: var(--soft); font-size: .8em; margin-left: auto; }
+  #embed { flex: 1; min-height: 240px; width: 100%; }
+</style>
+</head>
+<body>
+<div id="entete"><span class="maj">Chargement…</span></div>
+<div id="embed"></div>
+<script>
+(function () {
+  // Réglages par l'adresse : ?m=or|argent  &t=1d|1w|1m|1q|1y  &h=0 (masque le prix au-dessus)  &sw=1 (boutons métal/devise/type)  &fond=ffffff  &texte=222222
+  var q = new URLSearchParams(location.search), hex = /^[0-9a-fA-F]{3,8}$/, r = document.documentElement.style;
+  if (hex.test(q.get("fond") || "")) r.setProperty("--fond", "#" + q.get("fond"));
+  if (hex.test(q.get("texte") || "")) r.setProperty("--texte", "#" + q.get("texte"));
+  var metal = q.get("m") === "argent" ? "argent" : "or";
+  var tf = /^(10m|1h|6h|1d|1w|1m|1q|1y|5y|20y)$/.test(q.get("t") || "") ? q.get("t") : "1w";
+  var boutons = q.get("sw") === "1";
+  var nf = function (x, d) { return x.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }); };
+
+  // --- graphique officiel BullionVault (bibliothèque hébergée par BullionVault)
+  var s = document.createElement("script");
+  s.src = "https://www.bullionvault.com/chart/bullionvaultchart.js";
+  s.onload = function () {
+    new BullionVaultChart({
+      bullion: metal === "or" ? "gold" : "silver", currency: "EUR", timeframe: tf, chartType: "line",
+      containerDefinedSize: true, miniChartMode: false, displayLatestPriceLine: true,
+      switchBullion: boutons, switchCurrency: boutons, switchTimeframe: true, switchChartType: boutons, exportButton: false
+    }, "embed");
+  };
+  document.head.appendChild(s);
+
+  // --- prix et variation au-dessus du graphique (même relevé que le bandeau)
+  var ent = document.getElementById("entete");
+  if (q.get("h") === "0") { ent.hidden = true; return; }
+  function variation(j, w) {
+    var v = j || w; if (!v || v.pct == null) return "";
+    var c = v.pct > 0 ? "pos" : v.pct < 0 ? "neg" : "neutre", f = v.pct > 0 ? "▲" : v.pct < 0 ? "▼" : "■";
+    return '<span class="v ' + c + '">' + f + " " + (v.pct > 0 ? "+" : "") + nf(v.pct, 2) + " % <small>" + (j ? "jour" : "sem.") + "</small></span>";
+  }
+  function afficher(d) {
+    var kg = metal === "or" ? d.or_kg : d.ag_kg, j = metal === "or" ? d.jour_or : d.jour_ag, w = metal === "or" ? d.var_or : d.var_ag;
+    var t = new Date(d.genere_le), ok = !isNaN(t);
+    ent.innerHTML = '<span class="nom">' + (metal === "or" ? "OR" : "ARGENT") + ' · prix du kilogramme</span>' +
+      '<span class="prix">' + nf(kg, 0) + " €</span>" +
+      '<span class="g">(' + nf(kg / 1000, metal === "or" ? 2 : 3) + " €/g)</span>" + variation(j, w) +
+      (ok ? '<span class="maj">relevé du ' + t.toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", " à") + "</span>" : "");
+  }
+  function charger() {
+    fetch("data/public.json?t=" + Date.now(), { cache: "no-store" }).then(function (x) { if (!x.ok) throw 0; return x.json(); })
+      .then(function (d) { if (d && d.or_kg && d.ag_kg) afficher(d); }).catch(function () {});
+  }
+  charger(); setInterval(charger, 120000);
+})();
+</script>
+</body>
+</html>
