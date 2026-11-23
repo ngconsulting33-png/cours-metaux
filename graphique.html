@@ -28,13 +28,13 @@
 <div id="embed"></div>
 <script>
 (function () {
-  // Réglages par l'adresse : ?m=or|argent  &t=1d|1w|1m|1q|1y  &h=0 (masque le prix au-dessus)  &sw=1 (boutons métal/devise/type)  &fond=ffffff  &texte=222222
+  // Réglages par l'adresse : ?m=or|argent  &t=1d|1w|1m|1q|1y  &h=0 (masque le prix au-dessus)  &sw=1 (boutons métal/devise/type)  &mini=1 (version compacte, espace étroit)  &fond=ffffff  &texte=222222
   var q = new URLSearchParams(location.search), hex = /^[0-9a-fA-F]{3,8}$/, r = document.documentElement.style;
   if (hex.test(q.get("fond") || "")) r.setProperty("--fond", "#" + q.get("fond"));
   if (hex.test(q.get("texte") || "")) r.setProperty("--texte", "#" + q.get("texte"));
   var metal = q.get("m") === "argent" ? "argent" : "or";
   var tf = /^(10m|1h|6h|1d|1w|1m|1q|1y|5y|20y)$/.test(q.get("t") || "") ? q.get("t") : "1w";
-  var boutons = q.get("sw") === "1";
+  var boutons = q.get("sw") === "1", mini = q.get("mini") === "1";  // mini=1 : version compacte pour les espaces étroits
   var nf = function (x, d) { return x.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }); };
 
   // --- graphique officiel BullionVault (bibliothèque hébergée par BullionVault)
@@ -43,8 +43,8 @@
   s.onload = function () {
     new BullionVaultChart({
       bullion: metal === "or" ? "gold" : "silver", currency: "EUR", timeframe: tf, chartType: "line",
-      containerDefinedSize: true, miniChartMode: false, displayLatestPriceLine: true,
-      switchBullion: boutons, switchCurrency: boutons, switchTimeframe: true, switchChartType: boutons, exportButton: false
+      containerDefinedSize: true, miniChartMode: mini, miniChartModeAxis: "kg", displayLatestPriceLine: true,
+      switchBullion: boutons, switchCurrency: boutons, switchTimeframe: !mini, switchChartType: boutons, exportButton: false
     }, "embed");
   };
   document.head.appendChild(s);
