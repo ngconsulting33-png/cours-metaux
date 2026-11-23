@@ -1,0 +1,53 @@
+name: Mise à jour des cours
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # secours : le déclenchement principal vient de cron-job.org ; minutes décalées car GitHub saute souvent :00 et :30
+    - cron: "17,47 8-17 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer le navigateur de lecture
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Relever les cours
+        run: |
+          mkdir -p _site/data
+          cp index.html robots.txt _site/
+          python3 releve.py _site/data/public.json
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  publier:
+    needs: construire
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
