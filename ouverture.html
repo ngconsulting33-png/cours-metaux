@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Statut d'ouverture</title>
+<style>
+  :root { --fond: transparent; --texte: #222; --ok: #1a8a3c; --ko: #d12c2c; --rdv: #b8860b; --soft: #777; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--fond); color: var(--texte);
+    font: 15px/1.25 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  .s { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 8px; min-height: 32px; flex-wrap: wrap; }
+  .p { width: 10px; height: 10px; border-radius: 50%; background: var(--soft); flex: none; }
+  .ouvert .p { background: var(--ok); box-shadow: 0 0 0 3px rgba(26,138,60,.25); }
+  .ferme .p { background: var(--ko); }
+  .rdv .p { background: var(--rdv); }
+  b { font-weight: 700; }
+  .d { color: var(--soft); }
+</style>
+</head>
+<body>
+<div class="s" id="s"><span class="d">…</span></div>
+<script>
+(function () {
+  // ===== HORAIRES (à modifier ici si besoin) : jour 0 = dimanche … 6 = samedi ; créneaux "HH:MM-HH:MM"
+  var HORAIRES = {
+    0: [],
+    1: ["13:45-17:45"],
+    2: ["09:30-11:45", "13:45-17:45"],
+    3: ["09:30-11:45", "13:45-16:45"],
+    4: ["09:30-11:45", "13:45-17:45"],
+    5: ["09:30-11:45", "13:45-17:45"],
+    6: []                      // samedi : sur rendez-vous uniquement
+  };
+  var SAMEDI_RDV = true;       // true : affiche « Samedi : sur rendez-vous »
+  var FERME_LES = [            // fermetures exceptionnelles (jours fériés, congés) au format "AAAA-MM-JJ"
+    // "2026-12-25", "2027-01-01"
+  ];
+  // =====
+  var q = new URLSearchParams(location.search), hex = /^[0-9a-fA-F]{3,8}$/, r = document.documentElement.style;
+  if (q.get("theme") === "sombre") { r.setProperty("--texte", "#ffffff"); r.setProperty("--ok", "#6fe39a"); r.setProperty("--ko", "#ff8a80"); r.setProperty("--rdv", "#e6c25a"); r.setProperty("--soft", "#e3cdb8"); }
+  if (hex.test(q.get("fond") || "")) r.setProperty("--fond", "#" + q.get("fond"));
+  if (hex.test(q.get("texte") || "")) r.setProperty("--texte", "#" + q.get("texte"));
+  var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  var min = function (h) { var a = h.split(":"); return +a[0] * 60 + +a[1]; };
+  var hh = function (m) { return String(Math.floor(m / 60)).padStart(2, "0") + "h" + String(m % 60).padStart(2, "0"); };
+
+  // heure de Paris (?test=2026-11-24T10:00 pour essayer une autre date/heure)
+  function paris() {
+    var t = q.get("test"), d;
+    if (t && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(t)) {
+      var x = t.split(/[-T:]/).map(Number); d = new Date(Date.UTC(x[0], x[1] - 1, x[2], x[3], x[4]));
+      return { date: t.slice(0, 10), jour: d.getUTCDay(), m: x[3] * 60 + x[4], ref: d };
+    }
+    var p = {}; new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
+      .formatToParts(new Date()).forEach(function (o) { p[o.type] = o.value; });
+    var date = p.year + "-" + p.month + "-" + p.day;
+    return { date: date, jour: new Date(Date.UTC(+p.year, +p.month - 1, +p.day)).getUTCDay(), m: (+p.hour % 24) * 60 + +p.minute, ref: new Date(Date.UTC(+p.year, +p.month - 1, +p.day)) };
+  }
+  function ajouterJours(ref, n) { var d = new Date(ref.getTime() + n * 86400000); return { date: d.toISOString().slice(0, 10), jour: d.getUTCDay() }; }
+  function creneaux(date, jour) { return FERME_LES.indexOf(date) >= 0 ? [] : HORAIRES[jour].map(function (c) { var a = c.split("-"); return [min(a[0]), min(a[1])]; }); }
+
+  function statut() {
+    var n = paris(), cr = creneaux(n.date, n.jour), i;
+    for (i = 0; i < cr.length; i++) if (n.m >= cr[i][0] && n.m < cr[i][1])
+      return { c: "ouvert", h: "<b>Ouvert</b> <span class='d'>· jusqu'à " + hh(cr[i][1]) + "</span>" };
+    for (i = 0; i < cr.length; i++) if (n.m < cr[i][0])
+      return { c: "ferme", h: "<b>Fermé</b> <span class='d'>· ouvre à " + hh(cr[i][0]) + "</span>" };
+    if (n.jour === 6 && SAMEDI_RDV && FERME_LES.indexOf(n.date) < 0)
+      return { c: "rdv", h: "<b>Samedi</b> <span class='d'>· sur rendez-vous uniquement</span>" };
+    for (var k = 1; k <= 8; k++) {
+      var j = ajouterJours(n.ref, k), c2 = creneaux(j.date, j.jour);
+      if (c2.length) return { c: "ferme", h: "<b>Fermé</b> <span class='d'>· ouvre " + (k === 1 ? "demain" : JOURS[j.jour]) + " à " + hh(c2[0][0]) + "</span>" };
+    }
+    return { c: "ferme", h: "<b>Fermé</b>" };
+  }
+  function afficher() { var s = statut(), e = document.getElementById("s"); e.className = "s " + s.c; e.innerHTML = '<span class="p"></span><span>' + s.h + "</span>"; }
+  afficher(); setInterval(afficher, 60000);
+})();
+</script>
+</body>
+</html>
